@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://YOUR-BACKEND-RENDER-APP.onrender.com/api/:path*"
+      "destination": "https://medshield-twin-1.onrender.com/api/:path*"
     },
     {
       "source": "/((?!api/|assets/).*)",
