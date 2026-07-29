@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, ShieldAlert, Cpu, UserPlus, Info, CheckCircle } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 const DEPARTMENTS = [
   "Reception", "Emergency Room", "ICU", "Operation Theatre",
@@ -39,9 +40,9 @@ export default function AdminPage({ user }) {
 
   const fetchDevices = async () => {
     try {
-      const response = await fetch('/api/devices');
+      const response = await fetch(getApiUrl('/api/devices'), { credentials: 'include' });
       const data = await response.json();
-      setDevices(data);
+      setDevices(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -61,9 +62,10 @@ export default function AdminPage({ user }) {
     setDeviceSuccess(false);
 
     try {
-      const response = await fetch('/api/devices', {
+      const response = await fetch(getApiUrl('/api/devices'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           id: devId,
           name: devName,
@@ -96,8 +98,9 @@ export default function AdminPage({ user }) {
     if (!window.confirm(`Are you sure you want to delete and decommission device ${id}?`)) return;
 
     try {
-      const response = await fetch(`/api/devices/${id}`, {
-        method: 'DELETE'
+      const response = await fetch(getApiUrl(`/api/devices/${id}`), {
+        method: 'DELETE',
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok && data.success) {
@@ -117,9 +120,10 @@ export default function AdminPage({ user }) {
     setUserSuccess(false);
 
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch(getApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           username: regUsername,
           password: regPassword,

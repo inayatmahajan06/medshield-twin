@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Cpu, AlertTriangle, ShieldCheck, ShieldAlert, BarChart3, Info, RefreshCw } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 export default function AIThreatPage() {
   // Playground sliders state
@@ -29,9 +30,10 @@ export default function AIThreatPage() {
   const evaluateFeatures = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/ml/predict', {
+      const response = await fetch(getApiUrl('/api/ml/predict'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           packet_rate: parseFloat(packetRate),
           packet_size_avg: parseFloat(packetSize),
@@ -41,15 +43,26 @@ export default function AIThreatPage() {
         })
       });
       const data = await response.json();
-      if (response.ok) {
-        setPrediction(data.prediction);
-        setConfidence(data.confidence);
-        setThreatScore(data.threat_score);
-        setExplanation(data.explanation);
-        setContributions(data.feature_contributions);
+      if (response.ok && data) {
+        setPrediction(data.prediction || 'Normal');
+        setConfidence(data.confidence || 0);
+        setThreatScore(data.threat_score || 0);
+        setExplanation(data.explanation || 'Prediction unavailable.');
+        setContributions(data.feature_contributions || {});
+      } else {
+        setPrediction('Unavailable');
+        setConfidence(0);
+        setThreatScore(0);
+        setExplanation(data.message || 'The ML API is unavailable.');
+        setContributions({});
       }
     } catch (err) {
-      console.error("Error running prediction:", err);
+      console.error('Error running prediction:', err);
+      setPrediction('Unavailable');
+      setConfidence(0);
+      setThreatScore(0);
+      setExplanation('The ML API could not be reached.');
+      setContributions({});
     } finally {
       setLoading(false);
     }

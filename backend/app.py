@@ -22,7 +22,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from database.db_manager import (
     get_db_connection, register_user, authenticate_user, add_log,
-    get_devices, get_alerts, get_logs, update_device_telemetry, tamper_blockchain_db
+    get_devices, get_alerts, get_logs, update_device_telemetry, tamper_blockchain_db,
+    ensure_db_initialized
 )
 from blockchain.blockchain import Blockchain
 from digital_twin.simulator import HospitalSimulator
@@ -33,9 +34,36 @@ from reports.generator import generate_security_report
 app = Flask(__name__)
 app.secret_key = "medshield_super_secure_key_123" # Required for session encryption
 
-# Configure CORS so React (typically port 5173) can talk to Flask (port 5000)
-# We enable credentials support to allow cookies/sessions to work.
-CORS(app, supports_credentials=True, resources={r"/api/*": {"origins": "*"}})
+# Configure CORS dynamically for credentials and Vercel/local origins
+CORS(app, supports_credentials=True, origins=r".*")
+
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = app.make_default_options_response()
+        return response
+
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get("Origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
+
+@app.errorhandler(500)
+def handle_500_error(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "Internal Server Error", "message": str(e)}), 500
+    return "Internal Server Error", 500
+
+@app.errorhandler(404)
+def handle_404_error(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "Not Found", "message": "Endpoint not found"}), 404
+    return "Not Found", 404
 
 # --- Flask-Login Configuration ---
 login_manager = LoginManager()
@@ -85,11 +113,19 @@ def require_role(allowed_roles):
     return current_user.role in allowed_roles
 
 
-# --- Authentication API Routes ---
+# --- Health and Authentication API Routes ---
+
+@app.route("/", methods=["GET"])
+def api_root():
+    return jsonify({"status": "ok", "service": "MedShield Twin API"})
+
+@app.route("/api/health", methods=["GET"])
+def api_health():
+    return jsonify({"status": "ok", "database": "ready", "ml": "ready"})
 
 @app.route("/api/auth/register", methods=["POST"])
 def api_register():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     username = data.get("username")
     password = data.get("password")
     role = data.get("role", "Guest") # default to guest
@@ -109,7 +145,7 @@ def api_register():
 
 @app.route("/api/auth/login", methods=["POST"])
 def api_login():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     username = data.get("username")
     password = data.get("password")
     
@@ -182,7 +218,7 @@ def api_add_device():
     if not require_role(["Admin"]):
         return jsonify({"success": False, "message": "Access Denied: Admin role required"}), 403
         
-    data = request.json
+    data = request.get_json(silent=True) or {}
     dev_id = data.get("id")
     name = data.get("name")
     room = data.get("room")
@@ -299,7 +335,7 @@ def api_tamper_blockchain():
     if not require_role(["Admin", "Security Analyst"]):
         return jsonify({"success": False, "message": "Access Denied"}), 403
         
-    data = request.json
+    data = request.get_json(silent=True) or {}
     block_index = data.get("block_index")
     tampered_data = data.get("data")
     
@@ -322,8 +358,11 @@ def api_download_report():
         
     user_name = current_user.username if current_user.is_authenticated else "System Analyst"
     
-    # Target path inside backend folder
-    report_pdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "hospital_security_report.pdf"))
+    # Target path inside backend folder or /tmp on Vercel
+    if os.environ.get("VERCEL"):
+        report_pdf_path = "/tmp/hospital_security_report.pdf"
+    else:
+        report_pdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "hospital_security_report.pdf"))
     
     # Generate
     generate_security_report(report_pdf_path, user_name)
@@ -347,7 +386,7 @@ def api_settings():
     if request.method == "POST":
         if not require_role(["Admin"]):
             return jsonify({"success": False, "message": "Admin privileges required"}), 403
-        data = request.json
+        data = request.get_json(silent=True) or {}
         system_settings["scan_interval"] = int(data.get("scan_interval", system_settings["scan_interval"]))
         system_settings["ai_threshold"] = int(data.get("ai_threshold", system_settings["ai_threshold"]))
         system_settings["email_alerts_enabled"] = bool(data.get("email_alerts_enabled", system_settings["email_alerts_enabled"]))
@@ -359,7 +398,7 @@ def api_settings():
 
 @app.route("/api/ml/predict", methods=["POST"])
 def api_ml_predict():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     packet_rate = float(data.get("packet_rate", 10))
     packet_size_avg = float(data.get("packet_size_avg", 200))
     port_entropy = float(data.get("port_entropy", 0.05))
@@ -375,7 +414,7 @@ def api_start_attack():
     if not require_role(["Admin", "Security Analyst"]):
         return jsonify({"success": False, "message": "Access Denied"}), 403
         
-    data = request.json
+    data = request.get_json(silent=True) or {}
     device_id = data.get("device_id")
     attack_type = data.get("attack_type")
     
@@ -406,13 +445,20 @@ def api_start_attack():
 
 def start_background_threads():
     """
-    Purpose: Spawn sniffer and simulator daemon threads.
+    Purpose: Spawn sniffer and simulator daemon threads safely (skip on Vercel serverless).
     """
-    # Start packet sniffer & hospital simulator
-    simulator.start()
-    print("Background simulation threads initialized.")
+    if os.environ.get("VERCEL"):
+        print("Running in Vercel Serverless environment; skipping persistent background threads.")
+        return
 
-# Start threads immediately
+    try:
+        simulator.start()
+        print("Background simulation threads initialized.")
+    except Exception as e:
+        print(f"Background simulation thread init warning: {e}")
+
+# Initialize the database and start background threads once the app is imported.
+ensure_db_initialized()
 start_background_threads()
 
 if __name__ == "__main__":

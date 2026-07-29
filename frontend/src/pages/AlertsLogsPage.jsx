@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, AlertTriangle, List, ShieldAlert, Cpu, Eye, Filter } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 export default function AlertsLogsPage() {
   const [activeTab, setActiveTab] = useState('alerts'); // 'alerts' or 'logs'
@@ -22,13 +23,13 @@ export default function AlertsLogsPage() {
   const fetchData = async () => {
     try {
       if (activeTab === 'alerts') {
-        const response = await fetch('/api/alerts?limit=100');
+        const response = await fetch(getApiUrl('/api/alerts?limit=100'), { credentials: 'include' });
         const data = await response.json();
-        setAlerts(data);
+        setAlerts(Array.isArray(data) ? data : []);
       } else {
-        const response = await fetch('/api/logs?limit=150');
+        const response = await fetch(getApiUrl('/api/logs?limit=150'), { credentials: 'include' });
         const data = await response.json();
-        setLogs(data);
+        setLogs(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error("Error fetching logs/alerts:", err);

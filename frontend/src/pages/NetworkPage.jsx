@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Search, ShieldAlert, ShieldCheck, Activity, Filter, Info } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 export default function NetworkPage() {
   const [packets, setPackets] = useState([]);
@@ -17,9 +18,9 @@ export default function NetworkPage() {
 
   const fetchPackets = async () => {
     try {
-      const response = await fetch('/api/packets?limit=80');
+      const response = await fetch(getApiUrl('/api/packets?limit=80'), { credentials: 'include' });
       const data = await response.json();
-      setPackets(data);
+      setPackets(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching packets:", err);
     }

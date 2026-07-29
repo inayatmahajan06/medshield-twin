@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Database, ShieldCheck, ShieldAlert, Edit3, Check, RefreshCw, Link2, Info } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 export default function BlockchainPage({ user }) {
   const [chain, setChain] = useState([]);
@@ -22,12 +23,12 @@ export default function BlockchainPage({ user }) {
 
   const fetchBlockchain = async () => {
     try {
-      const response = await fetch('/api/blockchain');
+      const response = await fetch(getApiUrl('/api/blockchain'), { credentials: 'include' });
       const data = await response.json();
-      setChain(data);
+      setChain(Array.isArray(data) ? data : []);
       
       // Auto-run integrity check
-      const verifyRes = await fetch('/api/blockchain/verify');
+      const verifyRes = await fetch(getApiUrl('/api/blockchain/verify'), { credentials: 'include' });
       const verifyData = await verifyRes.json();
       setAuditResult(verifyData);
     } catch (err) {
@@ -42,7 +43,7 @@ export default function BlockchainPage({ user }) {
   const handleVerify = async () => {
     setAuditing(true);
     try {
-      const verifyRes = await fetch('/api/blockchain/verify');
+      const verifyRes = await fetch(getApiUrl('/api/blockchain/verify'), { credentials: 'include' });
       const verifyData = await verifyRes.json();
       setAuditResult(verifyData);
     } catch (err) {
@@ -63,9 +64,10 @@ export default function BlockchainPage({ user }) {
     setTamperStatus("Writing corrupt block directly to SQL...");
     
     try {
-      const response = await fetch('/api/blockchain/tamper', {
+      const response = await fetch(getApiUrl('/api/blockchain/tamper'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           block_index: parseInt(tamperIndex),
           data: tamperData

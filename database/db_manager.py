@@ -11,18 +11,63 @@ import sqlite3
 import bcrypt
 from datetime import datetime
 
-# Path to the SQLite database file
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "hospital.db"))
+def get_db_path():
+    """Returns DB path dynamically, falling back to /tmp on Vercel or read-only environments."""
+    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        return "/tmp/hospital.db"
+    base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "hospital.db"))
+    try:
+        if not os.path.exists(base_path):
+            with open(base_path, "a") as f:
+                pass
+    except (PermissionError, OSError):
+        return "/tmp/hospital.db"
+    return base_path
+
+def ensure_db_initialized():
+    """Create the SQLite schema and seed data once per process."""
+    db_path = get_db_path()
+    if not os.path.exists(db_path):
+        init_db()
+        return True
+
+    conn = _raw_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            init_db()
+            return True
+    except Exception as exc:
+        print(f"DB initialization check failed: {exc}")
+    finally:
+        conn.close()
+    return True
+
+
+def _raw_db_connection():
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def get_db_connection():
     """
     Purpose: Establish and return a connection to the SQLite database.
     Input: None
     Output: sqlite3.Connection object
-    Logic: Connects to the database and sets the row_factory to sqlite3.Row for dictionary-like access.
+    Logic: Connects to the database and ensures tables are initialized if needed.
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _raw_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            conn.close()
+            init_db()
+            conn = _raw_db_connection()
+    except Exception as e:
+        print(f"DB auto-init check error: {e}")
     return conn
 
 def init_db():
@@ -33,7 +78,7 @@ def init_db():
     Logic: Runs SQL DDL commands to create tables: users, devices, alerts, logs, and blockchain_store.
            Then seeds default users (Admin, Analyst, Guest) and 10 rooms of IoMT devices.
     """
-    conn = get_db_connection()
+    conn = _raw_db_connection()
     cursor = conn.cursor()
 
     # 1. Users Table
@@ -369,4 +414,6 @@ def tamper_blockchain_db(block_index, tampered_data):
     return True
 
 if __name__ == "__main__":
-    init_db()
+    ensure_db_initialized()
+else:
+    ensure_db_initialized()

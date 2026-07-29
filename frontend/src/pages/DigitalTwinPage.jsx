@@ -11,6 +11,7 @@ import {
   Activity, ShieldAlert, Wifi, WifiOff, Thermometer,
   Heart, AlertTriangle, Play, HelpCircle, HardDrive, Terminal
 } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 const ROOMS_LIST = [
   { id: "Reception", name: "Reception Desk", desc: "Patient intake & check-in kiosk" },
@@ -35,16 +36,16 @@ export default function DigitalTwinPage({ user }) {
 
   const fetchData = async () => {
     try {
-      const devRes = await fetch('/api/devices');
+      const devRes = await fetch(getApiUrl('/api/devices'), { credentials: 'include' });
       const devData = await devRes.json();
-      setDevices(devData);
+      setDevices(Array.isArray(devData) ? devData : []);
 
-      const alertRes = await fetch('/api/alerts?limit=30');
+      const alertRes = await fetch(getApiUrl('/api/alerts?limit=30'), { credentials: 'include' });
       const alertData = await alertRes.json();
-      setAlerts(alertData);
+      setAlerts(Array.isArray(alertData) ? alertData : []);
 
       // Keep selected device telemetry fresh by matching ID
-      if (selectedDevice) {
+      if (selectedDevice && Array.isArray(devData)) {
         const freshDev = devData.find(d => d.id === selectedDevice.id);
         if (freshDev) setSelectedDevice(freshDev);
       }
@@ -94,9 +95,10 @@ export default function DigitalTwinPage({ user }) {
     setInjectStatus("Injecting payload...");
     
     try {
-      const response = await fetch('/api/simulation/start-attack', {
+      const response = await fetch(getApiUrl('/api/simulation/start-attack'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           device_id: selectedDevice.id,
           attack_type: attackType

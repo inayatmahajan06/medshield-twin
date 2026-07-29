@@ -15,6 +15,7 @@ import {
 
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import { getApiUrl } from './api/config';
 import DashboardPage from './pages/DashboardPage';
 import DigitalTwinPage from './pages/DigitalTwinPage';
 import NetworkPage from './pages/NetworkPage';
@@ -34,22 +35,52 @@ function AppContent() {
   // Sync active login status with Flask backend on mount
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/current');
-      const data = await response.json();
-      if (response.ok && data.authenticated) {
-        setUser(data.user);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(getApiUrl('/api/auth/current'), {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include'
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.authenticated) {
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
       } else {
         setUser(null);
       }
     } catch (err) {
       console.error("Auth sync error:", err);
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    checkAuthStatus();
+    let isMounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 3500);
+
+    checkAuthStatus().finally(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   const handleLoginSuccess = (loggedInUser) => {
@@ -58,7 +89,7 @@ function AppContent() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch(getApiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' });
       setUser(null);
       navigate('/');
     } catch (err) {

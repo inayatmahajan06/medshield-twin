@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Save, Database, ShieldAlert, CheckCircle, Info, Moon, Sun, Mail } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 export default function SettingsPage({ user }) {
   const [darkMode, setDarkMode] = useState(true);
@@ -21,11 +22,13 @@ export default function SettingsPage({ user }) {
   // Fetch settings from Flask
   const fetchSettings = async () => {
     try {
-      const response = await fetch('/api/settings');
+      const response = await fetch(getApiUrl('/api/settings'), { credentials: 'include' });
       const data = await response.json();
-      setScanInterval(data.scan_interval);
-      setAiThreshold(data.ai_threshold);
-      setEmailAlerts(data.email_alerts_enabled);
+      if (data) {
+        if (data.scan_interval !== undefined) setScanInterval(data.scan_interval);
+        if (data.ai_threshold !== undefined) setAiThreshold(data.ai_threshold);
+        if (data.email_alerts_enabled !== undefined) setEmailAlerts(data.email_alerts_enabled);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -59,9 +62,10 @@ export default function SettingsPage({ user }) {
     }
 
     try {
-      const response = await fetch('/api/settings', {
+      const response = await fetch(getApiUrl('/api/settings'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           scan_interval: parseInt(scanInterval),
           ai_threshold: parseInt(aiThreshold),

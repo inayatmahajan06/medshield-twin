@@ -22,6 +22,7 @@ import {
   Shield, Cpu, AlertTriangle, CheckCircle, Database,
   Activity, Play, FileText, ArrowRight, Clock, Plus, Trash2
 } from 'lucide-react';
+import { getApiUrl } from '../api/config';
 
 // Register ChartJS elements
 ChartJS.register(
@@ -45,24 +46,24 @@ export default function DashboardPage({ user }) {
   const fetchStats = async () => {
     try {
       // Fetch devices
-      const devRes = await fetch('/api/devices');
+      const devRes = await fetch(getApiUrl('/api/devices'), { credentials: 'include' });
       const devData = await devRes.json();
-      setDevices(devData);
+      setDevices(Array.isArray(devData) ? devData : []);
 
       // Fetch alerts
-      const alertRes = await fetch('/api/alerts?limit=6');
+      const alertRes = await fetch(getApiUrl('/api/alerts?limit=6'), { credentials: 'include' });
       const alertData = await alertRes.json();
-      setAlerts(alertData);
+      setAlerts(Array.isArray(alertData) ? alertData : []);
 
       // Fetch recent logs
-      const logRes = await fetch('/api/logs?limit=8');
+      const logRes = await fetch(getApiUrl('/api/logs?limit=8'), { credentials: 'include' });
       const logData = await logRes.json();
-      setLogs(logData);
+      setLogs(Array.isArray(logData) ? logData : []);
 
       // Fetch blockchain length
-      const bcRes = await fetch('/api/blockchain');
+      const bcRes = await fetch(getApiUrl('/api/blockchain'), { credentials: 'include' });
       const bcData = await bcRes.json();
-      setBlockchainLength(bcData.length);
+      setBlockchainLength(Array.isArray(bcData) ? bcData.length : 0);
     } catch (err) {
       console.error("Error fetching stats:", err);
     } finally {
@@ -82,7 +83,7 @@ export default function DashboardPage({ user }) {
   const onlineDevices = devices.filter(d => d.status === 'Online' || d.status === 'Safe').length;
   const attackedDevices = devices.filter(d => d.status === 'Under Attack').length;
   const offlineDevices = devices.filter(d => d.status === 'Offline').length;
-  const avgRisk = totalDevices ? Math.round(devices.reduce((acc, curr) => acc + curr.risk_score, 0) / totalDevices) : 0;
+  const avgRisk = totalDevices ? Math.round(devices.reduce((acc, curr) => acc + (curr.risk_score || 0), 0) / totalDevices) : 0;
 
   // Handle PDF report generation
   const handleDownloadReport = async () => {
@@ -92,7 +93,7 @@ export default function DashboardPage({ user }) {
     }
     
     try {
-      window.open('/api/reports/download', '_blank');
+      window.open(getApiUrl('/api/reports/download'), '_blank');
     } catch (err) {
       console.error("Error downloading report:", err);
     }
