@@ -35,7 +35,12 @@ app = Flask(__name__)
 app.secret_key = "medshield_super_secure_key_123" # Required for session encryption
 
 # Configure CORS dynamically for credentials and Vercel/local origins
-CORS(app, supports_credentials=True, origins=r".*")
+CORS(app, supports_credentials=True, origins=[
+    "https://medshield-twin.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    r"https://.*\.vercel\.app"
+])
 
 @app.before_request
 def handle_preflight():
@@ -116,8 +121,14 @@ def require_role(allowed_roles):
 # --- Health and Authentication API Routes ---
 
 @app.route("/", methods=["GET"])
+@app.route("/api", methods=["GET"])
+@app.route("/api/", methods=["GET"])
 def api_root():
-    return jsonify({"status": "ok", "service": "MedShield Twin API"})
+    return jsonify({
+        "status": "ok",
+        "service": "MedShield Twin API",
+        "message": "MedShield Twin Flask Backend is active and running."
+    })
 
 @app.route("/api/health", methods=["GET"])
 def api_health():

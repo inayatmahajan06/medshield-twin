@@ -69,6 +69,18 @@ class PacketSniffer:
         Output: List of packet dictionaries.
         """
         with self.lock:
+            if not self.packet_buffer:
+                now_str = datetime.now().strftime("%H:%M:%S")
+                for _ in range(min(count, 10)):
+                    self.packet_buffer.append({
+                        "src_ip": random.choice(self.hospital_ips),
+                        "dst_ip": random.choice(self.hospital_ips),
+                        "protocol": random.choice(["TCP", "UDP", "HL7/TLS"]),
+                        "port": random.choice([443, 8080, 502, 104]),
+                        "size": random.randint(128, 1024),
+                        "timestamp": now_str,
+                        "status": "Normal"
+                    })
             return list(self.packet_buffer[-count:])
 
     def _scapy_packet_callback(self, packet):

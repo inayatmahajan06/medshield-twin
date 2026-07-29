@@ -14,9 +14,9 @@ if root_dir not in sys.path:
 
 # Initialize database tables and seed default users/devices
 try:
-    from database.db_manager import init_db
-    init_db()
+    from database.db_manager import ensure_db_initialized
+    ensure_db_initialized()
 except Exception as e:
-    print(f"Vercel Serverless Init DB Error: {e}")
+    print(f"Vercel Serverless Init DB Warning: {e}")
 
 from backend.app import app
