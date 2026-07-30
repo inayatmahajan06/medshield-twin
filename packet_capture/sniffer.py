@@ -14,12 +14,23 @@ import threading
 import sys
 import os
 
-# Try importing scapy components
+# Suppress Scapy's verbose Npcap/libpcap missing warning.
+# Scapy writes this warning directly to sys.stderr (bypasses Python logging),
+# so we silence it by redirecting stderr to devnull during the import only.
+import logging
+logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
+_stderr = sys.stderr
 try:
+    sys.stderr = open(os.devnull, 'w')
     from scapy.all import sniff, IP, TCP, UDP
     SCAPY_AVAILABLE = True
 except ImportError:
     SCAPY_AVAILABLE = False
+finally:
+    sys.stderr.close()
+    sys.stderr = _stderr
+
 
 # Maximum packets to keep in the memory buffer
 MAX_BUFFER_SIZE = 100

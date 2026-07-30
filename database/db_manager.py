@@ -47,8 +47,11 @@ def ensure_db_initialized():
 
 def _raw_db_connection():
     db_path = get_db_path()
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    # WAL mode allows concurrent reads with a single writer, preventing lock errors
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA busy_timeout=30000;")
     return conn
 
 def get_db_connection():

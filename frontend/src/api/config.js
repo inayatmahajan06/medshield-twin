@@ -3,6 +3,10 @@
  * ---------
  * Helper utility for building API URLs with VITE_API_URL environment variable support.
  * Ensures local dev proxy and deployed environments (Vercel, custom backend host) work seamlessly.
+ *
+ * Local Dev:  VITE_API_URL is unset → returns relative path (e.g. "/api/devices")
+ *             → Vite dev-server proxy forwards /api/* to http://127.0.0.1:5000
+ * Production: Set VITE_API_URL=https://your-backend.com in .env and deployed env vars.
  */
 
 export const getApiUrl = (endpoint = '') => {
@@ -14,9 +18,7 @@ export const getApiUrl = (endpoint = '') => {
     return `${baseUrl}${cleanEndpoint}`;
   }
 
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return `${window.location.origin}${cleanEndpoint}`;
-  }
-
+  // In development, use relative paths so the Vite proxy (/api → localhost:5000) works.
+  // In production builds without VITE_API_URL, fall back to same-origin.
   return cleanEndpoint;
 };
